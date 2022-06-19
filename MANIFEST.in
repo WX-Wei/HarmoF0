@@ -1,0 +1,6 @@
+recursive-include harmof0 *.py
+recursive-include checkpoints *.pth
+include README.md
+include LICENSE
+include requirements.txt
+include MANIFEST.in
