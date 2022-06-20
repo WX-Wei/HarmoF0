@@ -4,7 +4,7 @@ This repo is the Pytorch implementation of ["HarmoF0: Logarithmic Scale Dilated 
 
 HarmoF0 is a light-weight and high-performance pitch tracking model using multi-rate dilated convolution. The evaluation results with threshold of 50 cents are:
   
-![](img/table2.png)
+![ ](https://github.com/WX-Wei/HarmoF0/raw/86ed681d34cecab106309af7eff23a5691c0c85a/img/table2.png)
 
 ## Installing and usage
 
@@ -46,7 +46,7 @@ a.f0.txt
 
 a.activation.png
 
-![](img/a.activation.png)
+![ ](https://github.com/WX-Wei/HarmoF0/raw/86ed681d34cecab106309af7eff23a5691c0c85a/img/a.activation.png)
 
 
 Use specified output dir and device:
