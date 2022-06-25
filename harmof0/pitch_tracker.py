@@ -97,10 +97,11 @@ class PitchTracker():
 
         Parameters
         -------
+        activation_map: ndarray [T x 352]
+
         Returns
         -------
         '''
-        activation_map = torch.squeeze(activation_map, dim=0).cpu().numpy()
         high_map = activation_map >= high_threshold
         low_map = activation_map >= low_threshold
         out_map = np.zeros_like(activation_map)
@@ -169,13 +170,9 @@ class PitchTracker():
                 # => [b x num_frames x (88*4)], [b x num_frames x (88*4)]
                 est_onehot, specgram = self.net.eval()(waveforms)
 
-            # result_dict['pred_freqs'] += list(est_freqs_flatten)
-            # result_dict['pred_activations'] += list(est_activations_flatten)
-            result_dict['pred_activations_map'] += [est_onehot.cpu()]
+            result_dict['pred_activations_map'] += [est_onehot.squeeze(0).cpu()]
 
-        # pred_freq = np.array(result_dict['pred_freqs'])
-        # pred_activation = np.array(result_dict['pred_activations'])
-        pred_activation_map = torch.concat(result_dict['pred_activations_map'], dim=1).detach().clone()
+        pred_activation_map = torch.concat(result_dict['pred_activations_map'], dim=0).cpu().numpy()
 
         if(self.post_processing):
             pred_activation_map = self.postProcessing(pred_activation_map, self.high_threshold, self.low_threshold)
