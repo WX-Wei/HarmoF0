@@ -23,6 +23,11 @@ def main():
         parser.add_argument('--save-activation', type=bool, default=True, help="Save the activation as png.")
         parser.add_argument('--frames-per-step', type=int, default=1000, help="The number of frames for a step.")
         parser.add_argument('--hop-length', type=int, default=160, help="The sample rate is 16000, so the default 160 means 10 milliseconds.")
+        parser.add_argument('--post-processing', type=bool, default=True, help="use post processing.")
+        parser.add_argument('--high_threshold', type=float, default=0.8, help="high threshold for post processing.")
+        parser.add_argument('--low_threshold', type=float, default=0.1, help="low threshold for post processing.")
+        parser.add_argument('--min_pitch_dur', type=float, default=0.1, help="min pitch duration for post processing.")
+        parser.add_argument("--n_beam", type=int, default=5, help="beam number of post processing.")
         parser.add_argument('--checkpoint-path', type=str, default=None, help="The path to pretrained model weight.")
 
         args = parser.parse_args()
@@ -31,6 +36,11 @@ def main():
             args.checkpoint_path, 
             hop_length=args.hop_length,
             device=args.device, 
-            frames_per_step=args.frames_per_step
+            frames_per_step=args.frames_per_step,
+            post_processing=args.post_processing,
+            high_threshold=args.high_threshold,
+            low_threshold=args.low_threshold,
+            min_pitch_dur=args.min_pitch_dur,
+            n_beam=args.n_beam,
         )
         pitch_tracker.pred_file(args.audio_path, args.output_dir, args.save_activation)

@@ -8,9 +8,6 @@ import torch.nn.functional as F
 import torchaudio
 from torch.utils.data import DataLoader
 
-
-
-
 # system
 from tqdm import tqdm
 from datetime import datetime
@@ -21,14 +18,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from .network import HarmoF0
-# from . import HarmoF0
-
-# from sacred import Experiment
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-# ex = Experiment('harmof0', save_git_info=False)
-
-# from mono_config import ex
 
 class PitchTracker():
     def __init__(self, 
@@ -38,6 +29,11 @@ class PitchTracker():
         hop_length = 160,
         frame_len = 1024,
         frames_per_step = 1000,
+        post_processing = True,
+        high_threshold=0.8, 
+        low_threshold=0.1, 
+        n_beam = 5, 
+        min_pitch_dur = 0.1,
         freq_bins_in = 88*4,
         freq_bins_out = 88*4,
         bins_per_octave_in = 48,
@@ -62,6 +58,13 @@ class PitchTracker():
         self.hop_length = hop_length
         self.frame_len = frame_len
         self.frames_per_step = frames_per_step
+        # post processing
+        self.min_pitch_len = min_pitch_dur * sample_rate / hop_length
+        self.post_processing = post_processing
+        self.high_threshold = high_threshold
+        self.low_threshold = low_threshold
+        self.n_beam = n_beam
+
         self.device = device
 
         self.freq_bins_in = freq_bins_in
@@ -71,12 +74,59 @@ class PitchTracker():
         self.fmin = fmin
         self.sample_rate = sample_rate
 
+    def visit(self, activation_map, low_map, out_map, t, pitch, visited_set, sub_set, n_beam):
+        if(t, pitch) in visited_set or low_map[t, pitch] < 1:
+            return
+        out_map[t, pitch] = activation_map[t, pitch] 
+        visited_set.add((t, pitch))
+        sub_set.add((t, pitch))
+
+        low = max(0, pitch - n_beam)
+        high = min(low_map.shape[1], pitch + n_beam) 
+        # visit left
+        if t > 0:
+            for p in range(low, high):
+                self.visit(activation_map, low_map, out_map, t-1, p, visited_set, sub_set, n_beam)
+        #visit right
+        if(t < low_map.shape[0] -1):
+            for p in range(low, high):
+                self.visit(activation_map, low_map, out_map, t+1, p, visited_set, sub_set, n_beam)
+
+    def postProcessing(self, activation_map, high_threshold=0.8, low_threshold=0.1):
+        '''
+
+        Parameters
+        -------
+        Returns
+        -------
+        '''
+        activation_map = torch.squeeze(activation_map, dim=0).cpu().numpy()
+        high_map = activation_map >= high_threshold
+        low_map = activation_map >= low_threshold
+        out_map = np.zeros_like(activation_map)
+
+        visited_set = set()
+        rows, cols = high_map.nonzero()
+        for t, pitch in zip(rows, cols):
+            sub_set = set()
+            self.visit(activation_map, low_map, out_map, t, pitch, visited_set, sub_set, self.n_beam)
+            # remove the region that has length < self.min_pitch_len
+            if len(sub_set) > 0:
+                pit_len = max([x[0] for x in sub_set]) - min([x[0] for x in sub_set])
+                if pit_len < self.min_pitch_len:
+                    for t, pitch in sub_set:
+                        out_map[t, pitch] = 0
+        return out_map
+
+        
+
     def pred(self, waveform, sr):
         # inputs: 
         #     waveform:
         #     sr: 16000
         # returns:
         #     time, freq, activation, activation_map
+        #     [T], [T], [T], [T x 352]
 
         if isinstance(waveform,np.ndarray):
             waveform = torch.tensor(waveform)
@@ -104,8 +154,8 @@ class PitchTracker():
         times = np.arange(num_frames) * (self.hop_length/self.sample_rate)
 
         result_dict = {
-            'pred_freqs':[],
-            'pred_activations':[],
+            # 'pred_freqs':[],
+            # 'pred_activations':[],
             'pred_activations_map':[],
         }
 
@@ -115,23 +165,25 @@ class PitchTracker():
             begin = i * self.frames_per_step
             end = begin + self.frames_per_step
             waveforms = batch[:, begin:end ]
-            # print('waveform.shape', waveforms.shape)
             with torch.no_grad():
                 # => [b x num_frames x (88*4)], [b x num_frames x (88*4)]
                 est_onehot, specgram = self.net.eval()(waveforms)
 
-            # => [num_frames ]
-            est_freqs, est_activations = self.onehot_to_hz(est_onehot, self.bins_per_octave_out, threshold=0)
-            est_freqs_flatten = est_freqs.flatten().cpu().detach().numpy()
-            est_activations_flatten = est_activations.flatten().cpu().detach().numpy()
+            # result_dict['pred_freqs'] += list(est_freqs_flatten)
+            # result_dict['pred_activations'] += list(est_activations_flatten)
+            result_dict['pred_activations_map'] += [est_onehot.cpu()]
 
-            result_dict['pred_freqs'] += list(est_freqs_flatten)
-            result_dict['pred_activations'] += list(est_activations_flatten)
-            result_dict['pred_activations_map'] += [est_onehot.flatten(0, 1).cpu().detach().numpy()]
+        # pred_freq = np.array(result_dict['pred_freqs'])
+        # pred_activation = np.array(result_dict['pred_activations'])
+        pred_activation_map = torch.concat(result_dict['pred_activations_map'], dim=1).detach().clone()
 
-        pred_freq = np.array(result_dict['pred_freqs'])
-        pred_activation = np.array(result_dict['pred_activations'])
-        pred_activation_map = np.concatenate(result_dict['pred_activations_map'], axis=0)
+        if(self.post_processing):
+            pred_activation_map = self.postProcessing(pred_activation_map, self.high_threshold, self.low_threshold)
+
+        # => [num_frames ]
+        est_freqs, est_activations = self.onehot_to_hz(torch.tensor(pred_activation_map)[None,:], self.bins_per_octave_out, threshold=0.0)
+        pred_freq = est_freqs.flatten().cpu().numpy()
+        pred_activation = est_activations.flatten().cpu().numpy()
 
         return times, pred_freq, pred_activation, pred_activation_map
 
@@ -154,20 +206,23 @@ class PitchTracker():
                 os.makedirs(result_dir, exist_ok=True)
             wav_name, ext = os.path.splitext(basename)
             pred_path = os.path.join(result_dir, wav_name + ".f0.txt")
-            activation_path = os.path.join(result_dir, wav_name + ".activation.png")
 
             waveform, sr = torchaudio.load(wav_path)
             waveform = torch.sum(waveform, dim=0, keepdim=True)
             print(f'audio {i+1} of {len(wav_path_list)}')
-            # print("dur:", waveform.shape[1]/sr)
 
             pred_time, pred_freq, activation, activation_map = self.pred(waveform, sr)
 
-            # print("output inference result!")
             pred_table = np.stack([pred_time, pred_freq, activation], axis=1)
             np.savetxt(pred_path, pred_table, header='time frequency activation', fmt="%.03f")
             if(save_activation):
+                if self.post_processing == False:
+                    activation_path = os.path.join(result_dir, wav_name + ".activation.png")
+                else:
+                    activation_path = os.path.join(result_dir, wav_name + ".activation.post.png")
                 plt.imsave(activation_path, activation_map.T[::-1])
+                # activation_map_post = self.postProcessing(activation_map)
+                # plt.imsave(activation_post_path, activation_map_post.T[::-1])
 
     def hz_to_onehot(self, hz, freq_bins, bins_per_octave):
         # input: [b x T]
@@ -191,7 +246,7 @@ class PitchTracker():
         fmin = self.fmin
         max_onehot = torch.max(onehot, dim=2)
         indexs = max_onehot[1]
-        mask = (max_onehot[0] >= threshold).float()
+        mask = (max_onehot[0] > threshold).float()
 
         hz = fmin * (2**(indexs/bins_per_octave))
         hz = hz * mask # set freq to 0 if activate val below threshold
