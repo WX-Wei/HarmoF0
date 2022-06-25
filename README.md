@@ -48,10 +48,17 @@ a.activation.png
 
 ![ ](https://github.com/WX-Wei/HarmoF0/raw/86ed681d34cecab106309af7eff23a5691c0c85a/img/a.activation.png)
 
+Use post processing:
+```bash
+harmof0 test --post-processing=True
+```
+a.activation.post.png
+![ ](https://github.com/WX-Wei/HarmoF0/raw/3da25f82c1b67861bdbfe584ee52c83b3e1f9a88/img/a.activation.post.png)
+
 
 Use specified output dir and device:
 
-```
+```bash
 $ harmof0 test/a.mp3 --output-dir=output --device=cuda
 ```
 
