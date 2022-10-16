@@ -23,7 +23,7 @@ def main():
         parser.add_argument('--save-activation', type=eval, default=True, help="Save the activation as png.")
         parser.add_argument('--frames-per-step', type=int, default=1000, help="The number of frames for a step.")
         parser.add_argument('--hop-length', type=int, default=160, help="The sample rate is 16000, so the default 160 means 10 milliseconds.")
-        parser.add_argument('--post-processing', type=eval, default=True, help="use post processing.")
+        parser.add_argument('--post-processing', type=eval, default=False, help="use post processing.")
         parser.add_argument('--high-threshold', type=float, default=0.8, help="high threshold for post processing.")
         parser.add_argument('--low-threshold', type=float, default=0.1, help="low threshold for post processing.")
         parser.add_argument('--min-pitch-dur', type=float, default=0.1, help="min pitch duration for post processing.")

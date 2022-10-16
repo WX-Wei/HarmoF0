@@ -43,7 +43,7 @@ def dila_conv_block(
             # pool
         )
     elif(dilation_mode == 'fixed'):
-        conv_dil = nn.Conv2d(out_channel, out_channel, kernel_size=dil_kernel_size, padding='same', dilation=[1, dilation_rate])
+        conv_dil = nn.Conv2d(out_channel, out_channel, kernel_size=dil_kernel_size, padding=[0, dilation_rate], dilation=[1, dilation_rate])
         
         return nn.Sequential(
             conv,nn.ReLU(),

@@ -16,6 +16,7 @@ from glob import glob
 
 import numpy as np
 import matplotlib.pyplot as plt
+import librosa
 
 from .network import HarmoF0
 
@@ -29,7 +30,7 @@ class PitchTracker():
         hop_length = 160,
         frame_len = 1024,
         frames_per_step = 1000,
-        post_processing = True,
+        post_processing = False,
         high_threshold=0.8, 
         low_threshold=0.1, 
         n_beam = 5, 
@@ -141,7 +142,11 @@ class PitchTracker():
             waveform = resampler(waveform)
 
         # start from the 0
-        waveform = F.pad(waveform, [self.frame_len//2, 0], mode='reflect')
+        # waveform = F.pad(waveform, [self.frame_len//2, 0], mode='reflect')
+        waveform_pad = waveform[:, :self.frame_len//2].flip(dims=[1,])
+        torch.cat([waveform_pad, waveform], dim=1)
+
+
         b, wav_len = waveform.shape
         assert b == 1
         num_frames = int((wav_len - self.frame_len)//self.hop_length) + 1
@@ -172,7 +177,7 @@ class PitchTracker():
 
             result_dict['pred_activations_map'] += [est_onehot.squeeze(0).cpu()]
 
-        pred_activation_map = torch.concat(result_dict['pred_activations_map'], dim=0).cpu().numpy()
+        pred_activation_map = torch.cat(result_dict['pred_activations_map'], dim=0).cpu().numpy()
 
         if(self.post_processing):
             pred_activation_map = self.postProcessing(pred_activation_map, self.high_threshold, self.low_threshold)
@@ -204,7 +209,12 @@ class PitchTracker():
             wav_name, ext = os.path.splitext(basename)
             pred_path = os.path.join(result_dir, wav_name + ".f0.txt")
 
-            waveform, sr = torchaudio.load(wav_path)
+            try:
+                waveform, sr = torchaudio.load(wav_path)
+            except:
+                waveform, sr = librosa.load(wav_path, sr=self.sample_rate)
+                waveform = torch.tensor(waveform)[None, :]
+
             waveform = torch.sum(waveform, dim=0, keepdim=True)
             print(f'audio {i+1} of {len(wav_path_list)}')
 
