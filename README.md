@@ -82,7 +82,23 @@ time, freq, activation, activation_map = pit.pred(waveform, sr)
 
 ```
 
-
+## Citation
+```
+@inproceedings{Wei2022Harmof0,
+  author       = {Weixing Wei and
+                  Peilin Li and
+                  Yi Yu and
+                  Wei Li},
+  title        = {HarmoF0: Logarithmic Scale Dilated Convolution for Pitch Estimation},
+  booktitle    = {{IEEE} International Conference on Multimedia and Expo, {ICME} 2022,
+                  Taipei, Taiwan, July 18-22, 2022},
+  pages        = {1--6},
+  publisher    = {{IEEE}},
+  year         = {2022},
+  url          = {https://doi.org/10.1109/ICME52920.2022.9858935},
+  doi          = {10.1109/ICME52920.2022.9858935},
+}
+```
 
 
 
