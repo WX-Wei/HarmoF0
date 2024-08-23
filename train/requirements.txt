@@ -1,0 +1,12 @@
+numpy
+sacred
+tqdm
+librosa
+mir_eval
+pandas
+matplotlib
+torch
+torchaudio
+tensorboard
+nnAudio==0.2.6
+h5py
